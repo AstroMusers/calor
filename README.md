@@ -1,3 +1,5 @@
 # calor
 
-calor is a pipeline for characterizing and modeling thermal anomalies of exoplanets based on their expected irradiation from their host stars.
+`calor` is a pipeline for characterizing and modeling thermal anomalies of rocky exoplanets based on their expected irradiation from their host stars. It simulates planetary internal processes, including residual heat from formation, tidal heating, and induction heating, in an attempt to explain the thermal emission excesses observed for some rocky exoplanets orbiting M dwarfs (or "M-Earths"). Details about the simulation methods and the science case can be found in [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412).
+
+This repository includes a script (reproduce_figures.ipynb) to reproduce the figures in [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412), using two data files presented in the work. Data_all_planets.csv contains exoplanet system data from both the [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/index.html) and the [PlanetS catalog](https://dace.unige.ch/exoplanets/?), as well as parameters derived in [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412), such as the thermal emission potential $\Delta R$. Data_observed_planets.csv contains observed parameters for rocky exoplanets with dayside emission temperature characterizations by JWST or Spitzer.

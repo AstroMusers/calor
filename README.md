@@ -1,12 +1,48 @@
 # calor
 
-`calor` is a pipeline for characterizing and modeling thermal anomalies of rocky exoplanets based on their expected irradiation from their host stars. It simulates planetary internal processes, including residual heat from formation, tidal heating, and induction heating, in an attempt to explain the thermal emission excesses observed for some rocky exoplanets orbiting M dwarfs (or "M-Earths"). Details about the simulation methods and the science case can be found in [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412).
+How hot should a rocky exoplanet be, given the starlight it receives? We use Calor to compare that expectation with dayside emission measurements and explore how residual formation heat, tides, and induction heating could contribute to thermal excesses in planets orbiting M dwarfs, or "M-Earths." A high temperature gets our attention. Establishing which process supplies the heat takes more than a temperature alone. We describe the calculations and science case in [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412).
 
-This repository includes two Jupyter Notebook scripts to reproduce the data analysis processes and figures presented in [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412), two main data files, and some auxiliary data files.
-- `reproduce_figures.ipynb`, as its name suggests, reproduces figures in the paper (except for Fig. 3, 10, and 11).
+The two Jupyter notebooks and their input data reproduce the analysis and figures from our paper.
+- `reproduce_figures.ipynb` reproduces figures from our paper, except for Fig. 3, 10, and 11.
 - `analyze_R_vs_Tirr` analyzes the observational data of rocky exoplanets with dayside emission temperature measurements and generates Fig. 3, 10, and 11.
-- `Data_all_planets.csv` contains exoplanet system data from both the [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/index.html) and the [PlanetS catalog](https://dace.unige.ch/exoplanets/?), as well as parameters derived in [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412), such as the thermal emission potential $\Delta R$.
+- `Data_all_planets.csv` contains exoplanet system data from both the [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/index.html) and the [PlanetS catalog](https://dace.unige.ch/exoplanets/?), as well as parameters derived in our study [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412), such as the thermal emission potential $\Delta R$.
 - `Data_observed_planets.csv` contains observed parameters for rocky exoplanets with dayside emission temperature characterizations by JWST or Spitzer.
 - `Coy_et_al_2025_Table2.csv` and `Ito_et_al_2015_P_T.csv` contains relevant data from the literature. Check out [Coy et al. (2025)](https://ui.adsabs.harvard.edu/abs/2025ApJ...987...22C/abstract), [Ito et al. (2015)](https://ui.adsabs.harvard.edu/abs/2015ApJ...801..144I/abstract), and our scripts for their physical meanings and how they are used.
 - `Tirr_Roche_boundaries.csv` contains pre-computed $T_{\rm irr}$ boundaries corresponding to the Roche limit distances of exoplanets in our sample.
 - The folder `MR_curves` contains exoplanet mass-radius curves computed using the `CORGI` planetary interior composition and structure code. For details about `CORGI`, check out [Lin et al. (2025)](https://ui.adsabs.harvard.edu/abs/2025PSJ.....6...27L/abstract).
+
+## PCAT thermal-regime inference
+
+We also use PCAT to ask how many changes in slope the temperature-ratio data support, instead of fixing that number in advance. `calor.infer_temperature_regimes` samples a continuous broken power law for $\mathcal R=T_{\rm day}/T_{\rm max}$ as a function of irradiation temperature. Each breakpoint contributes its log temperature and a slope change. PCAT samples their number, locations, and slopes using birth, death, and within-dimension moves. With zero breakpoints the trend is a single power law. These empirical regimes do not uniquely identify residual heat, tides, induction heating, or atmospheric redistribution.
+
+The default count prior is Poisson with mean 1, normalized over zero through three breakpoints. The initial-segment normalization is log-uniform over 0.2 to 2. Initial slopes and slope changes have uniform priors from -2 to 2. Break temperatures are log-uniform over the supplied interval, defaulting to the observed temperature range. These priors are configurable and should be checked for the intended comparison.
+
+The Gaussian likelihood marginalizes supplied irradiation-temperature errors with Gaussian quadrature. Ratio errors can use the existing notebook's symmetric approximation $(\sigma_+-\sigma_-)/2$. The calculation treats temperature and ratio errors as independent and does not include covariance from shared stellar parameters. The observational notebook section makes its one-estimate-per-planet selection explicit. Alternate reductions and measurements in different bands should not automatically be treated as independent planets.
+
+Install the current workspace libraries in editable mode:
+
+```bash
+python -m pip install -e tansudaylan/tdpy -e tansudaylan/chalcedon -e tansudaylan/pcat -e astromusers/calor
+```
+
+From Python, supply the measured temperatures, ratios, and their uncertainties:
+
+```python
+from calor import infer_temperature_regimes
+
+posterior = infer_temperature_regimes(
+	temperature_kelvin, measured_ratios, ratio_uncertainties,
+	temperature_uncertainties,
+	maximum_breaks=3, number_chains=4, seed=42,
+)
+```
+
+The result retains every variable-sized breakpoint catalog, base parameters, count probabilities, full count traces, log posterior values, and move acceptance counts. Compare independent chains, inspect count transitions, test quadrature convergence, and check prior sensitivity before interpreting the results. Short smoke runs establish execution, not convergence or evidence estimates.
+
+The appended PCAT section in `analyze_R_vs_Tirr.ipynb` performs observational inference without modifying the published fixed-fit cells. It is a new analysis extension rather than a claim that the original paper used PCAT. The standalone synthetic example injects a slope change at 1700 K with an initial slope of 0.15, a slope change of -0.75, and independent ratio noise of 0.025:
+
+```bash
+python examples/temperature_regimes.py --steps 12000 --chains 4
+```
+
+It saves posterior catalogs and a full-temperature-range figure beneath `visuals/temperature_regimes/`. These are explicitly synthetic measurements, not observed planets. No output paths specific to a workstation are embedded in the saved posterior.

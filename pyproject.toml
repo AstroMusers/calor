@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy", "scipy", "pandas", "matplotlib", "pcat", "tdpy"]
 
+[project.optional-dependencies]
+bokeh = ["bokeh>=3.0"]
+
 [tool.setuptools.packages.find]
 include = ["calor*"]
 

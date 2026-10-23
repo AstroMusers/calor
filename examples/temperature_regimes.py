@@ -77,6 +77,112 @@ def plot_result(result, output_path, typeplotback=None):
     plt.close(figure)
 
 
+@plot_style()
+def plot_result_bokeh(result, output_path, typeplotback=None):
+    try:
+        from bokeh.io import output_file, save
+        from bokeh.layouts import gridplot
+        from bokeh.models import ColumnDataSource, HoverTool
+        from bokeh.plotting import figure
+    except ImportError as error:
+        raise ImportError('Install Calor with the bokeh extra to create interactive plots.') from error
+
+    if typeplotback is not None:
+        configure_plot_style(typeplotback)
+    background, foreground = plot_background_colors()
+    temperature, observed, uncertainty, posterior, truth_base, truth_catalog = result
+    grid = np.linspace(temperature.min(), temperature.max(), 300)  # [K]
+    stride = max(1, len(posterior['catalog_samples']) // 1000)
+    models = np.array([evaluate_temperature_ratio(grid, base, catalog)
+                       for base, catalog in zip(posterior['base_samples'][::stride], posterior['catalog_samples'][::stride])])
+    lower, median, upper = np.percentile(models, [16, 50, 84], axis=0)
+    measurements = ColumnDataSource({
+        'temperature_kelvin': temperature,
+        'observed_ratio': observed,
+        'uncertainty': uncertainty,
+        'lower_ratio': observed - uncertainty,
+        'upper_ratio': observed + uncertainty,
+    })
+    trend = ColumnDataSource({
+        'temperature_kelvin': grid,
+        'lower_ratio': lower,
+        'median_ratio': median,
+        'upper_ratio': upper,
+        'input_ratio': evaluate_temperature_ratio(grid, truth_base, truth_catalog),
+    })
+    probabilities = posterior['break_count_probabilities']
+    counts = ColumnDataSource({
+        'break_count': np.arange(len(probabilities)),
+        'probability': probabilities,
+    })
+
+    temperature_plot = figure(
+        width=640, height=420, toolbar_location=None,
+        background_fill_color=background, border_fill_color=background,
+        x_axis_label='Irradiation temperature [K]',
+        y_axis_label='Dayside-to-maximum temperature ratio',
+        x_range=(temperature.min(), temperature.max()),
+    )
+    temperature_plot.segment(
+        x0='temperature_kelvin', x1='temperature_kelvin',
+        y0='lower_ratio', y1='upper_ratio',
+        source=measurements, color=foreground,
+    )
+    temperature_plot.scatter(
+        x='temperature_kelvin', y='observed_ratio', source=measurements,
+        marker='circle', size=7, color=foreground, legend_label='Synthetic measurements',
+    )
+    temperature_plot.varea(
+        x='temperature_kelvin', y1='lower_ratio', y2='upper_ratio', source=trend,
+        color='#007360', alpha=0.25,
+    )
+    temperature_plot.line(
+        x='temperature_kelvin', y='input_ratio', source=trend,
+        color='#A51417', line_dash='dashed', legend_label='Input trend',
+    )
+    temperature_plot.line(
+        x='temperature_kelvin', y='median_ratio', source=trend,
+        color='#007360', legend_label='PCAT posterior median',
+    )
+    temperature_plot.add_tools(HoverTool(
+        tooltips=[('Temperature', '@temperature_kelvin{0} K'),
+                  ('Observed ratio', '@observed_ratio{0.000}'),
+                  ('Uncertainty', '@uncertainty{0.000}')],
+        renderers=[temperature_plot.renderers[0]],
+    ))
+    temperature_plot.legend.location = 'top_left'
+    temperature_plot.legend.background_fill_color = background
+    temperature_plot.legend.border_line_color = foreground
+    temperature_plot.legend.label_text_color = foreground
+
+    count_plot = figure(
+        width=320, height=420, toolbar_location=None,
+        background_fill_color=background, border_fill_color=background,
+        x_axis_label='Number of trend breaks', y_axis_label='Posterior probability',
+        x_range=(-0.5, len(probabilities) - 0.5), y_range=(0, 1),
+    )
+    count_plot.vbar(x='break_count', top='probability', width=0.8, source=counts, color='#007360')
+    count_plot.xaxis.ticker = list(range(len(probabilities)))
+    count_plot.add_tools(HoverTool(
+        tooltips=[('Break count', '@break_count'), ('Probability', '@probability{0.000}')],
+    ))
+
+    for plot in (temperature_plot, count_plot):
+        for axis in (plot.xaxis, plot.yaxis):
+            axis.axis_label_text_color = foreground
+            axis.major_label_text_color = foreground
+            axis.axis_line_color = foreground
+            axis.major_tick_line_color = foreground
+            axis.minor_tick_line_color = foreground
+        plot.grid.grid_line_color = None
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f'Writing to {output_path}...')
+    output_file(filename=str(output_path), title='Synthetic thermal-regime inference with PCAT')
+    save(gridplot([[temperature_plot, count_plot]], merge_tools=True, toolbar_location='above'))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     add_plot_arguments(parser)
@@ -89,6 +195,10 @@ def main():
     result = run_example(arguments.output_directory, arguments.steps, arguments.chains)
     figure_path = arguments.figure_path or get_visuals_path() / f'temperature_regimes.{arguments.typefileplot}'
     plot_result(result, figure_path, arguments.typeplotback)
+    try:
+        plot_result_bokeh(result, figure_path.with_suffix('.html'), arguments.typeplotback)
+    except ImportError as error:
+        print(f'Skipping optional Bokeh plot: {error}')
     print('Posterior break-count probabilities:', result[3]['break_count_probabilities'])
 
 

@@ -27,6 +27,27 @@ def test_synthetic_example_runs_real_variable_dimension_sampler_and_saves_catalo
     assert mpimg.imread(output_path)[..., :3].min() < 0.8
 
 
+def test_bokeh_example_plot_contains_measurements_and_posterior_views(tmp_path):
+    pytest.importorskip('bokeh')
+    path = Path(__file__).parents[1] / 'examples' / 'temperature_regimes.py'
+    specification = importlib.util.spec_from_file_location('calor_temperature_bokeh_example', path)
+    example = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(example)
+    result = example.run_example(tmp_path, number_steps=600, number_chains=2)
+    output_path = tmp_path / 'temperature_regimes.html'
+
+    example.plot_result_bokeh(result, output_path)
+    html = output_path.read_text(encoding='utf-8')
+
+    assert 'Synthetic thermal-regime inference with PCAT' in html
+    assert 'Synthetic measurements' in html
+    assert 'PCAT posterior median' in html
+    assert 'lower_ratio' in html
+    assert 'upper_ratio' in html
+    assert 'Number of trend breaks' in html
+    assert 'Posterior probability' in html
+
+
 @pytest.mark.parametrize('typeplotback', ['white', 'dark'])
 @pytest.mark.parametrize('inherit', [False, True])
 def test_regime_plot_themes_preserve_measurements_and_probabilities(tmp_path, monkeypatch, typeplotback, inherit):

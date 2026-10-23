@@ -54,4 +54,6 @@ The standalone example uses a white plot background with black axes. Add
 `plot_result()` function accepts the same `typeplotback` option from Python
 and otherwise inherits an enclosing TDpy `plot_style()` theme.
 
+With the optional Bokeh extra installed, the CLI also writes an interactive HTML companion under `visuals/`. Install it with `python -m pip install -e ".[bokeh]"`.
+
 The example writes posterior catalogs under `data/temperature_regimes/` and a full-temperature-range figure directly under `visuals/`. Pass `--figure-path` to save the figure elsewhere. All values in these outputs come from the synthetic example.

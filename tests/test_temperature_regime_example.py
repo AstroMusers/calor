@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.image as mpimg
 import numpy as np
+import pytest
 
 
 def test_synthetic_example_runs_real_variable_dimension_sampler_and_saves_catalogs(tmp_path):
@@ -24,3 +25,53 @@ def test_synthetic_example_runs_real_variable_dimension_sampler_and_saves_catalo
     assert np.isclose(sum(payload['break_count_probabilities']), 1.0)
     assert str(tmp_path) not in json.dumps(payload)
     assert mpimg.imread(output_path)[..., :3].min() < 0.8
+
+
+@pytest.mark.parametrize('typeplotback', ['white', 'dark'])
+@pytest.mark.parametrize('inherit', [False, True])
+def test_regime_plot_themes_preserve_measurements_and_probabilities(tmp_path, monkeypatch, typeplotback, inherit):
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+    from PIL import Image
+    from tdpy.plotting import plot_background_colors, plot_style
+
+    path = Path(__file__).parents[1] / 'examples' / 'temperature_regimes.py'
+    specification = importlib.util.spec_from_file_location('calor_temperature_plot', path)
+    example = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(example)
+    temperature = np.linspace(500.0, 3000.0, 8)  # [K]
+    base = np.array([np.log(0.95), 0.15])
+    catalog = np.empty((0, 2))
+    observations = example.evaluate_temperature_ratio(temperature, base, catalog)
+    uncertainty = np.full(temperature.size, 0.025)
+    probabilities = np.array([0.6, 0.4])
+    posterior = {'base_samples': np.array([base, base]), 'catalog_samples': [catalog, catalog],
+                 'break_count_probabilities': probabilities}
+    result = (temperature, observations, uncertainty, posterior, base, catalog)
+    background, foreground = plot_background_colors(typeplotback)
+    save = plt.Figure.savefig
+    captured = []
+
+    def capture_and_save(figure, filename, **kwargs):
+        captured.append(figure)
+        assert figure.get_facecolor() == to_rgba(background)
+        axis = figure.axes[0]
+        assert axis.xaxis.label.get_color() == foreground
+        assert axis.lines[0].get_color() == foreground
+        np.testing.assert_array_equal(axis.lines[0].get_xdata(), temperature)
+        np.testing.assert_array_equal(axis.lines[0].get_ydata(), observations)
+        np.testing.assert_array_equal([bar.get_height() for bar in figure.axes[1].patches], probabilities)
+        return save(figure, filename, **kwargs)
+
+    monkeypatch.setattr(plt.Figure, 'savefig', capture_and_save)
+    options = {} if inherit else {'typeplotback': typeplotback}
+    outer_theme = typeplotback if inherit else ('dark' if typeplotback == 'white' else 'white')
+    filename = tmp_path / 'theme.png'
+    with plot_style(outer_theme):
+        original_settings = dict(plt.rcParams)
+        assert example.plot_result(result, filename, **options) is None
+        assert dict(plt.rcParams) == original_settings
+    assert len(captured) == 1
+    with Image.open(filename) as image:
+        expected = tuple(int(channel * 255) for channel in to_rgba(background)[:3])
+        assert image.convert('RGB').getpixel((0, 0)) == expected

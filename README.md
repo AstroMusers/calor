@@ -3,6 +3,8 @@
 How hot should a rocky exoplanet be, given the starlight it receives? We use Calor to compare that expectation with dayside emission measurements and explore how residual formation heat, tides, and induction heating could contribute to thermal excesses in planets orbiting M dwarfs, or "M-Earths." A high temperature gets our attention. Establishing which process supplies the heat takes more than a temperature alone. We describe the calculations and science case in [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412).
 
 The two Jupyter notebooks and their input data reproduce the analysis and figures from our paper.
+
+Set `CALOR_PATH` to the checkout directory when using Calor from another location. If it is unset, the package uses its checkout root. Local inference products belong in the ignored `data/` directory; example figures are saved directly in the ignored `visuals/` directory.
 - `reproduce_figures.ipynb` reproduces figures from our paper, except for Fig. 3, 10, and 11.
 - `analyze_R_vs_Tirr` analyzes the observational data of rocky exoplanets with dayside emission temperature measurements and generates Fig. 3, 10, and 11.
 - `Data_all_planets.csv` contains exoplanet system data from both the [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/index.html) and the [PlanetS catalog](https://dace.unige.ch/exoplanets/?), as well as parameters derived in our study [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412), such as the thermal emission potential $\Delta R$.
@@ -19,11 +21,13 @@ The default count prior is Poisson with mean 1, normalized over zero through thr
 
 The Gaussian likelihood marginalizes supplied irradiation-temperature errors with Gaussian quadrature. Ratio errors can use the existing notebook's symmetric approximation $(\sigma_+-\sigma_-)/2$. The calculation treats temperature and ratio errors as independent and does not include covariance from shared stellar parameters. The observational notebook section makes its one-estimate-per-planet selection explicit. Alternate reductions and measurements in different bands should not automatically be treated as independent planets.
 
-Install the current workspace libraries in editable mode:
+Install Calor and its local source dependencies from the Calor repository root:
 
 ```bash
-python -m pip install -e tansudaylan/tdpy -e tansudaylan/chalcedon -e tansudaylan/pcat -e astromusers/calor
+python -m pip install -e . -e /path/to/pcat -e /path/to/tdpy -e /path/to/chalcedon
 ```
+
+Replace each `/path/to/...` value with the location of that package's checkout.
 
 From Python, supply the measured temperatures, ratios, and their uncertainties:
 
@@ -37,12 +41,17 @@ posterior = infer_temperature_regimes(
 )
 ```
 
-The result retains every variable-sized breakpoint catalog, base parameters, count probabilities, full count traces, log posterior values, and move acceptance counts. Compare independent chains, inspect count transitions, test quadrature convergence, and check prior sensitivity before interpreting the results. Short smoke runs establish execution, not convergence or evidence estimates.
+The result retains every variable-sized breakpoint catalog, base parameters, count probabilities, full count traces, log posterior values, and move acceptance counts. Compare independent chains, inspect count transitions, test quadrature convergence, and check prior sensitivity before interpreting the posterior. A short smoke run confirms that the workflow executes. Use longer runs to assess convergence and evidence uncertainty.
 
-The appended PCAT section in `analyze_R_vs_Tirr.ipynb` performs observational inference without modifying the published fixed-fit cells. It is a new analysis extension rather than a claim that the original paper used PCAT. The standalone synthetic example injects a slope change at 1700 K with an initial slope of 0.15, a slope change of -0.75, and independent ratio noise of 0.025:
+The PCAT analysis estimates a variable-break model from the observational data in `analyze_R_vs_Tirr.ipynb`. The paper's published figures retain the original fixed-fit analysis. The standalone synthetic example injects a slope change at 1,700 K with an initial slope of 0.15, a slope change of -0.75, and independent ratio noise of 0.025:
 
 ```bash
 python examples/temperature_regimes.py --steps 12000 --chains 4
 ```
 
-It saves posterior catalogs and a full-temperature-range figure beneath `visuals/temperature_regimes/`. These are explicitly synthetic measurements, not observed planets. No output paths specific to a workstation are embedded in the saved posterior.
+The standalone example uses a white plot background with black axes. Add
+`--typeplotback dark` for a black background with white axes. Its
+`plot_result()` function accepts the same `typeplotback` option from Python
+and otherwise inherits an enclosing TDpy `plot_style()` theme.
+
+The example writes posterior catalogs under `data/temperature_regimes/` and a full-temperature-range figure directly under `visuals/`. Pass `--figure-path` to save the figure elsewhere. All values in these outputs come from the synthetic example.

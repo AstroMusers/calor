@@ -9,7 +9,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from calor import evaluate_temperature_ratio, infer_temperature_regimes
+from calor.paths import get_data_path, get_visuals_path
 from tdpy.cli import add_plot_arguments
+from tdpy.plotting import apply_plot_theme, configure_plot_style, plot_background_colors, plot_style
 from tdpy.verbosity import print
 
 
@@ -42,7 +44,11 @@ def run_example(output_directory, number_steps=12000, number_chains=4):
     return temperature, observed, uncertainty, posterior, truth_base, truth_catalog
 
 
-def plot_result(result, output_path):
+@plot_style()
+def plot_result(result, output_path, typeplotback=None):
+    if typeplotback is not None:
+        configure_plot_style(typeplotback)
+    background, foreground = plot_background_colors()
     temperature, observed, uncertainty, posterior, truth_base, truth_catalog = result
     grid = np.linspace(temperature.min(), temperature.max(), 300)  # [K]
     stride = max(1, len(posterior['catalog_samples']) // 1000)
@@ -50,8 +56,8 @@ def plot_result(result, output_path):
                        for base, catalog in zip(posterior['base_samples'][::stride], posterior['catalog_samples'][::stride])])
     lower, median, upper = np.percentile(models, [16, 50, 84], axis=0)
     figure, axes = plt.subplots(1, 2, figsize=(10.0, 4.2), gridspec_kw={'width_ratios': [2, 1]},
-                                facecolor='white', constrained_layout=True)
-    axes[0].errorbar(temperature, observed, yerr=uncertainty, fmt='.', color='black', label='Synthetic measurements')
+                                facecolor=background, constrained_layout=True)
+    axes[0].errorbar(temperature, observed, yerr=uncertainty, fmt='.', color=foreground, label='Synthetic measurements')
     axes[0].plot(grid, evaluate_temperature_ratio(grid, truth_base, truth_catalog), '--', color='#A51417', label='Input trend')
     axes[0].fill_between(grid, lower, upper, color='#007360', alpha=0.25)
     axes[0].plot(grid, median, color='#007360', label='PCAT posterior median')
@@ -65,20 +71,24 @@ def plot_result(result, output_path):
     for axis in axes:
         axis.grid(False)
     figure.suptitle('Synthetic thermal-regime inference with PCAT')
+    apply_plot_theme(figure)
     print(f'Writing to {output_path}...')
-    figure.savefig(output_path, dpi=300, bbox_inches='tight')
+    figure.savefig(output_path, dpi=300, bbox_inches='tight', facecolor=background)
     plt.close(figure)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     add_plot_arguments(parser)
+    parser.add_argument('--typeplotback', choices=('white', 'dark'), default='white')
     parser.add_argument('--steps', type=int, default=12000)
     parser.add_argument('--chains', type=int, default=4)
-    parser.add_argument('--output-directory', type=Path, default=Path(__file__).parents[1] / 'visuals' / 'temperature_regimes')
+    parser.add_argument('--output-directory', type=Path, default=get_data_path() / 'temperature_regimes')
+    parser.add_argument('--figure-path', type=Path)
     arguments = parser.parse_args()
     result = run_example(arguments.output_directory, arguments.steps, arguments.chains)
-    plot_result(result, arguments.output_directory / f'temperature_regimes.{arguments.typefileplot}')
+    figure_path = arguments.figure_path or get_visuals_path() / f'temperature_regimes.{arguments.typefileplot}'
+    plot_result(result, figure_path, arguments.typeplotback)
     print('Posterior break-count probabilities:', result[3]['break_count_probabilities'])
 
 

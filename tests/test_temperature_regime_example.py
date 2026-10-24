@@ -5,10 +5,12 @@ from pathlib import Path
 import matplotlib.image as mpimg
 import numpy as np
 import pytest
+from tdpy.verbosity import print
 
 
 def test_synthetic_example_runs_real_variable_dimension_sampler_and_saves_catalogs(tmp_path):
     path = Path(__file__).parents[1] / 'examples' / 'temperature_regimes.py'
+    print(f'Reading from {path}...')
     specification = importlib.util.spec_from_file_location('calor_temperature_regime_example', path)
     example = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(example)
@@ -16,20 +18,23 @@ def test_synthetic_example_runs_real_variable_dimension_sampler_and_saves_catalo
     result = example.run_example(tmp_path, number_steps=600, number_chains=2)
     output_path = tmp_path / 'temperature_regimes.png'
     example.plot_result(result, output_path)
-    print(f'Reading from {tmp_path / "temperature_regime_posterior.json"}...')
-    payload = json.loads((tmp_path / 'temperature_regime_posterior.json').read_text())
+    payload_path = tmp_path / 'temperature_regime_posterior.json'
+    print(f'Reading from {payload_path}...')
+    payload = json.loads(payload_path.read_text())
 
     assert payload['simulated'] is True
     assert len(payload['catalog_samples']) == len(payload['base_samples'])
     assert len({len(catalog) for catalog in payload['catalog_samples']}) > 1
     assert np.isclose(sum(payload['break_count_probabilities']), 1.0)
     assert str(tmp_path) not in json.dumps(payload)
+    print(f'Reading from {output_path}...')
     assert mpimg.imread(output_path)[..., :3].min() < 0.8
 
 
 def test_bokeh_example_plot_contains_measurements_and_posterior_views(tmp_path):
     pytest.importorskip('bokeh')
     path = Path(__file__).parents[1] / 'examples' / 'temperature_regimes.py'
+    print(f'Reading from {path}...')
     specification = importlib.util.spec_from_file_location('calor_temperature_bokeh_example', path)
     example = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(example)
@@ -37,6 +42,7 @@ def test_bokeh_example_plot_contains_measurements_and_posterior_views(tmp_path):
     output_path = tmp_path / 'temperature_regimes.html'
 
     example.plot_result_bokeh(result, output_path)
+    print(f'Reading from {output_path}...')
     html = output_path.read_text(encoding='utf-8')
 
     assert 'Synthetic thermal-regime inference with PCAT' in html
@@ -57,6 +63,7 @@ def test_regime_plot_themes_preserve_measurements_and_probabilities(tmp_path, mo
     from tdpy.plotting import plot_background_colors, plot_style
 
     path = Path(__file__).parents[1] / 'examples' / 'temperature_regimes.py'
+    print(f'Reading from {path}...')
     specification = importlib.util.spec_from_file_location('calor_temperature_plot', path)
     example = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(example)
@@ -93,6 +100,7 @@ def test_regime_plot_themes_preserve_measurements_and_probabilities(tmp_path, mo
         assert example.plot_result(result, filename, **options) is None
         assert dict(plt.rcParams) == original_settings
     assert len(captured) == 1
+    print(f'Reading from {filename}...')
     with Image.open(filename) as image:
         expected = tuple(int(channel * 255) for channel in to_rgba(background)[:3])
         assert image.convert('RGB').getpixel((0, 0)) == expected

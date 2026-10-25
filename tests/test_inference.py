@@ -43,6 +43,33 @@ def test_invalid_thermal_uncertainties_are_rejected():
         infer_temperature_regimes([500.0, 1000.0, 2000.0], [1.0, 1.0, 1.0], [0.0, 0.1, 0.1])
 
 
+@pytest.mark.parametrize('masked_input', [0, 1, 2, 3])
+def test_thermal_likelihood_rejects_masked_observations(masked_input):
+    observations = [
+        np.array([500.0, 1000.0, 2000.0]),
+        np.ones(3), np.full(3, 0.1), np.full(3, 20.0),
+    ]
+    observations[masked_input] = np.ma.array(
+        observations[masked_input], mask=[False, True, False],
+    )
+    observations[masked_input].data[1] = 99.0
+    with pytest.raises(ValueError, match='masked values'):
+        temperature_ratio_log_likelihood([0.0, 0.0], np.empty((0, 2)), *observations)
+
+
+def test_thermal_likelihood_preserves_unmasked_containers():
+    observations = [
+        np.array([500.0, 1000.0, 2000.0]),
+        np.ones(3), np.full(3, 0.1), np.full(3, 20.0),
+    ]
+    expected = temperature_ratio_log_likelihood([0.0, 0.0], np.empty((0, 2)), *observations)
+    actual = temperature_ratio_log_likelihood(
+        [0.0, 0.0], np.empty((0, 2)),
+        *(np.ma.array(values, mask=False) for values in observations),
+    )
+    assert actual == expected
+
+
 def test_temperature_marginalization_matches_linear_gaussian_convolution():
     temperature = np.array([1000.0, 1200.0])  # [K]
     temperature_errors = np.array([50.0, 40.0])  # [K]

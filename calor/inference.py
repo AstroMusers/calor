@@ -31,6 +31,10 @@ def evaluate_temperature_ratio(temperature_kelvin, base_parameters, break_catalo
 
 
 def _observations(temperature_kelvin, ratios, ratio_uncertainties, temperature_uncertainties):
+    if any(np.ma.is_masked(value) for value in (
+        temperature_kelvin, ratios, ratio_uncertainties, temperature_uncertainties,
+    )):
+        raise ValueError('Observation arrays must not contain masked values')
     temperature, ratios, errors = (np.asarray(value, dtype=float)
                                   for value in (temperature_kelvin, ratios, ratio_uncertainties))
     if any(value.ndim != 1 or value.size == 0 or not np.isfinite(value).all()

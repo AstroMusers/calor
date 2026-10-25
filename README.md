@@ -4,7 +4,7 @@ How hot should a rocky exoplanet be, given the starlight it receives? We use Cal
 
 The two Jupyter notebooks and their input data reproduce the analysis and figures from our paper.
 
-Set `CALOR_PATH` to the checkout directory when using Calor from another location. If it is unset, the package uses its checkout root. Local inference products belong in the ignored `data/` directory; example figures are saved directly in the ignored `visuals/` directory.
+Set `CALOR_PATH` to the checkout directory when using Calor from another location. If it is unset, the package uses its checkout root. Local inference products belong in the ignored `data/` directory. Example figures are saved directly in the ignored `visuals/` directory.
 - `reproduce_figures.ipynb` reproduces figures from our paper, except for Fig. 3, 10, and 11.
 - `analyze_R_vs_Tirr` analyzes the observational data of rocky exoplanets with dayside emission temperature measurements and generates Fig. 3, 10, and 11.
 - `Data_all_planets.csv` contains exoplanet system data from both the [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/index.html) and the [PlanetS catalog](https://dace.unige.ch/exoplanets/?), as well as parameters derived in our study [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412), such as the thermal emission potential $\Delta R$.

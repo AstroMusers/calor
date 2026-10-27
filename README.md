@@ -1,6 +1,6 @@
 # calor
 
-How hot should a rocky exoplanet be, given the starlight it receives? We use Calor to compare that expectation with dayside emission measurements and explore how residual formation heat, tides, and induction heating could contribute to thermal excesses in planets orbiting M dwarfs, or "M-Earths." A high temperature gets our attention. Establishing which process supplies the heat takes more than a temperature alone. We describe the calculations and science case in [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412).
+Calor compares measured dayside temperatures of rocky exoplanets with those expected from stellar irradiation. For planets around M dwarfs, residual formation heat, tides, and induction heating could contribute to excess emission. Temperature alone cannot distinguish these sources. See [Lin & Daylan (2026)](https://arxiv.org/abs/2601.00412) for the calculations and science case.
 
 The two Jupyter notebooks and their input data reproduce the analysis and figures from our paper.
 
@@ -41,7 +41,7 @@ posterior = infer_temperature_regimes(
 )
 ```
 
-The result retains every variable-sized breakpoint catalog, base parameters, count probabilities, full count traces, log posterior values, and move acceptance counts. Compare independent chains, inspect count transitions, test quadrature convergence, and check prior sensitivity before interpreting the posterior. A short smoke run confirms that the workflow executes. Use longer runs to assess convergence and evidence uncertainty.
+The result retains each variable-sized breakpoint catalog, base parameters, count probabilities, full count traces, log-posterior values, and move acceptance counts. Compare breakpoint-count probabilities across independent chains and check that increasing the quadrature order leaves the marginalized likelihood stable. The sampler does not calculate model evidence. Longer runs help assess convergence of the sampled probabilities.
 
 The PCAT analysis estimates a variable-break model from the observational data in `analyze_R_vs_Tirr.ipynb`. The paper's published figures retain the original fixed-fit analysis. The standalone synthetic example injects a slope change at 1,700 K with an initial slope of 0.15, a slope change of -0.75, and independent ratio noise of 0.025:
 

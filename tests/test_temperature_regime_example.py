@@ -1,11 +1,89 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
+import re
+import sys
+from types import SimpleNamespace
 
 import matplotlib.image as mpimg
 import numpy as np
 import pytest
 from tdpy.verbosity import print
+
+
+@pytest.mark.parametrize('suffix', ['.png', '.pdf'])
+@pytest.mark.parametrize('path_mode', ['absolute', 'relative', 'default', 'narrated'])
+def test_notebook_displays_output_without_narration(tmp_path, suffix, path_mode):
+    notebook_path = Path(__file__).parents[1] / 'examples' / 'temperature_regimes.ipynb'
+    print(f'Reading from {notebook_path}...')
+    notebook = json.loads(notebook_path.read_text(encoding='utf-8'))
+    source = ''.join(notebook['cells'][-1]['source'])
+    figure_path = (tmp_path / 'visuals' / f'temperature_regimes{suffix}'
+                   if path_mode == 'default' else tmp_path / f'temperature_regimes{suffix}')
+    figure_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f'Writing to {figure_path}...')
+    figure_path.write_bytes(b'figure')
+    displayed = []
+    arguments = (['--typefileplot', suffix[1:]] if path_mode == 'default'
+                 else ['--figure-path', figure_path.name if path_mode == 'relative' else str(figure_path)])
+    narration = f'Writing to {figure_path}...\n' if path_mode == 'narrated' else ''
+    namespace = {
+        'completed': SimpleNamespace(stdout=narration), 'arguments': arguments,
+        'environment': {'CALOR_PATH': str(tmp_path)},
+        'repository_path': tmp_path, 'Path': Path, 're': re, 'os': os,
+        'print': print, 'display': displayed.append,
+        'Image': lambda filename: ('image', filename),
+        'SVG': lambda filename: ('svg', filename),
+        'FileLink': lambda filename: ('link', filename),
+    }
+
+    exec(compile(source, str(notebook_path), 'exec'), namespace)
+
+    assert len(displayed) == 1
+    assert displayed[0][0] == ('link' if suffix == '.pdf' else 'image')
+
+
+def test_notebook_runs_in_memory_without_overwriting_source(tmp_path, monkeypatch):
+    nbformat = pytest.importorskip('nbformat')
+    nbclient = pytest.importorskip('nbclient')
+    pytest.importorskip('ipykernel')
+    from jupyter_client import KernelManager
+    from jupyter_client.kernelspec import KernelSpec
+    from PIL import Image
+
+    repository_path = Path(__file__).parents[1]
+    notebook_path = repository_path / 'examples' / 'temperature_regimes.ipynb'
+    print(f'Reading from {notebook_path}...')
+    original = notebook_path.read_bytes()
+    notebook = nbformat.reads(original.decode('utf-8'), as_version=4)
+    arguments = [
+        '--steps', '60', '--chains', '1', '--output-directory', str(tmp_path / 'posterior'),
+        '--figure-path', str(tmp_path / 'temperature_regimes.png'),
+    ]
+    setup_cell = next(cell for cell in notebook.cells if 'arguments = []' in cell.source)
+    setup_cell.source = setup_cell.source.replace('arguments = []', f'arguments = {arguments!r}')
+    monkeypatch.setenv('CALOR_PATH', str(tmp_path))
+    monkeypatch.setenv('TDPY_VERBOSITY', '0')
+    manager = KernelManager(kernel_name='python3')
+    manager._kernel_spec = KernelSpec(
+        argv=[sys.executable, '-m', 'ipykernel_launcher', '-f', '{connection_file}'],
+        display_name='Current Python', language='python',
+    )
+    client = nbclient.NotebookClient(
+        notebook, km=manager, timeout=120, resources={'metadata': {'path': str(repository_path)}}
+    )
+
+    client.execute()
+
+    assert any('image/png' in output.get('data', {}) for output in notebook.cells[-1].outputs)
+    figure_path = tmp_path / 'temperature_regimes.png'
+    print(f'Reading from {figure_path}...')
+    with Image.open(figure_path) as image:
+        assert np.asarray(image.convert('RGB')).std() > 5
+    assert (tmp_path / 'posterior' / 'temperature_regime_posterior.json').is_file()
+    print(f'Reading from {notebook_path}...')
+    assert notebook_path.read_bytes() == original
 
 
 def test_synthetic_example_runs_real_variable_dimension_sampler_and_saves_catalogs(tmp_path):

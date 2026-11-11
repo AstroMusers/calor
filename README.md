@@ -21,6 +21,10 @@ The default count prior is Poisson with mean 1, normalized over zero through thr
 
 The Gaussian likelihood marginalizes supplied irradiation-temperature errors with Gaussian quadrature. Ratio errors can use the existing notebook's symmetric approximation $(\sigma_+-\sigma_-)/2$. The calculation treats temperature and ratio errors as independent and does not include covariance from shared stellar parameters. The observational notebook section makes its one-estimate-per-planet selection explicit. Alternate reductions and measurements in different bands should not automatically be treated as independent planets.
 
+The forward model and likelihood reject masked temperatures, measurements, and
+model parameters rather than using the values hidden beneath their masks. They
+also reject complex inputs rather than discarding imaginary components.
+
 Install Calor and its local source dependencies from the Calor repository root:
 
 ```bash

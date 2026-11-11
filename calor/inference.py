@@ -15,6 +15,10 @@ def evaluate_temperature_ratio(temperature_kelvin, base_parameters, break_catalo
     temperature regimes, not uniquely identified heating or atmospheric processes.
     """
 
+    if any(np.ma.is_masked(value) for value in (temperature_kelvin, base_parameters, break_catalog)):
+        raise ValueError('Temperature, base parameters, and break catalog must not contain masked values')
+    if any(np.iscomplexobj(value) for value in (temperature_kelvin, base_parameters, break_catalog)):
+        raise ValueError('Temperature, base parameters, and break catalog must be real')
     temperature = np.asarray(temperature_kelvin, dtype=float)
     base = np.asarray(base_parameters, dtype=float)
     catalog = np.asarray(break_catalog, dtype=float)
@@ -35,6 +39,10 @@ def _observations(temperature_kelvin, ratios, ratio_uncertainties, temperature_u
         temperature_kelvin, ratios, ratio_uncertainties, temperature_uncertainties,
     )):
         raise ValueError('Observation arrays must not contain masked values')
+    if any(np.iscomplexobj(value) for value in (
+        temperature_kelvin, ratios, ratio_uncertainties, temperature_uncertainties,
+    )):
+        raise ValueError('Observation arrays must be real')
     temperature, ratios, errors = (np.asarray(value, dtype=float)
                                   for value in (temperature_kelvin, ratios, ratio_uncertainties))
     if any(value.ndim != 1 or value.size == 0 or not np.isfinite(value).all()
@@ -66,8 +74,11 @@ def _marginal_likelihood(base, catalog, latent_temperature, log_weights, ratios,
     predicted = evaluate_temperature_ratio(latent_temperature, base, catalog)
     with np.errstate(over='ignore', invalid='ignore'):
         residual = (ratios[:, None] - predicted) / errors[:, None]
-        log_density = -0.5 * residual**2 - np.log(errors[:, None] * np.sqrt(2.0 * np.pi))
-    return float(np.sum(logsumexp(log_density + log_weights, axis=1)))
+        log_density = (-0.5 * residual) * residual - np.log(errors[:, None]) - 0.5 * np.log(2.0 * np.pi)
+    weighted_density = log_density + log_weights
+    with np.errstate(over='ignore', under='ignore'):
+        marginal = weighted_density[:, 0] if weighted_density.shape[1] == 1 else logsumexp(weighted_density, axis=1)
+        return float(np.sum(marginal))
 
 
 def temperature_ratio_log_likelihood(
